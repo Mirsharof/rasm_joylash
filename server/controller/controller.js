@@ -1,0 +1,57 @@
+const UploadModel = require('../model/schema');
+const fs = require('fs');
+
+
+exports.home = async(req, res) => {
+	const all_images= await UploadModel.find()
+	res.render('main', {images:all_images});
+}
+
+exports.uploads = (req, res, next) => {
+	const files = req.files;
+
+
+	if (!files) {
+		const error = new Error('Iltimos rasm manzilini korsating');
+		error.httpStatusCode = 400;
+		return next(error)
+	}
+
+	// convert images into base 64 encoding
+	let imgArray = files.map((file) => {
+		let img = fs.readFileSync(file.path)
+
+		return encode_image = img.toString('base64')
+	})
+	let results=imgArray.map((src, index)=>{
+		 // create  object to store fata in the collection
+		 let finalImg={
+			 filename:files[index].originalname, 
+			 contentType:files[index].mimetype,
+			 imageBase64:src
+		 }
+		 let newUpload = new UploadModel(finalImg);
+		 return newUpload
+		  	.save()
+			.then(()=>{
+				return{msg:`${files[index].originalname} joylashtirildi`}
+			})
+			.catch(error=>{
+				if(error){
+					if(error.name==='MongoError'&& error.code === 11000){
+						return Promise.reject({error:`Duplicate ${files[index].originalname} File Already exists!`})
+					}
+					return Promise.reject({error:error.message||`Connot Upload ${files[index].originalname} Sometime Missing`})
+				}
+			})
+
+	 });
+	Promise.all(results)
+	.then(msg=>{
+		// res.json(msg);
+		res.redirect('/');
+	})
+	.catch(err=>{
+		res.json(err);
+	})
+}
